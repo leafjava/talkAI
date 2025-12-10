@@ -169,6 +169,8 @@ const assistantMessageId = ref(null)
 const messagesContainer = ref(null)
 const fileInput = ref(null)
 const uploadedImages = ref([]) // 存储已上传的图片信息 { file, preview, uploadedData }
+const isUserScrolling = ref(false) // 标记用户是否正在手动滚动
+const scrollTimeout = ref(null)
 
 // 开场白按钮选项
 const quickActions = [
@@ -181,19 +183,58 @@ const quickActions = [
 // 判断是否显示开场白按钮
 const showQuickActions = computed(() => !isLoading.value)
 
+// 检查是否在底部
+const isAtBottom = () => {
+  if (!messagesContainer.value) return true
+  const { scrollTop, scrollHeight, clientHeight } = messagesContainer.value
+  // 允许 50px 的误差范围
+  return scrollHeight - scrollTop - clientHeight < 50
+}
+
 // 滚动到底部
 const scrollToBottom = () => {
   nextTick(() => {
-    if (messagesContainer.value) {
+    if (messagesContainer.value && !isUserScrolling.value) {
       messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
     }
   })
 }
 
-// 监听消息变化，自动滚动
+// 监听用户滚动
+const handleScroll = () => {
+  // 清除之前的定时器
+  if (scrollTimeout.value) {
+    clearTimeout(scrollTimeout.value)
+  }
+  
+  // 检查是否在底部
+  if (isAtBottom()) {
+    isUserScrolling.value = false
+  } else {
+    isUserScrolling.value = true
+    
+    // 2秒后如果用户停止滚动且在底部，恢复自动滚动
+    scrollTimeout.value = setTimeout(() => {
+      if (isAtBottom()) {
+        isUserScrolling.value = false
+      }
+    }, 2000)
+  }
+}
+
+// 监听消息变化，只在用户未手动滚动时自动滚动
 watch(messages, () => {
-  scrollToBottom()
+  if (!isUserScrolling.value || isAtBottom()) {
+    scrollToBottom()
+  }
 }, { deep: true })
+
+// 监听容器挂载，添加滚动事件监听
+watch(messagesContainer, (newVal) => {
+  if (newVal) {
+    newVal.addEventListener('scroll', handleScroll)
+  }
+})
 
 const handleQuickAction = (actionText) => {
   handleSend(actionText)
@@ -240,6 +281,10 @@ const handleSend = async (customMessage) => {
   messages.value.push({ id: Date.now(), text: userMessage, sender: 'user' })
   message.value = ''
   isLoading.value = true
+  
+  // 发送新消息时，重置滚动状态，允许自动滚动到底部
+  isUserScrolling.value = false
+  scrollToBottom()
   
   try {
     // 先上传所有图片
