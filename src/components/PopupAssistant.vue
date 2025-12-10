@@ -46,7 +46,7 @@
         >
           <div
             :class="[
-              'max-w-[80%] rounded-lg px-4 py-2',
+              'max-w-[80%] rounded-lg px-4 py-2 whitespace-pre-wrap',
               msg.sender === 'user'
                 ? 'bg-blue-600 text-white'
                 : 'bg-gray-100 dark:bg-[#2e3b5e] text-gray-900 dark:text-gray-100'
@@ -134,6 +134,9 @@ const messagesContainer = ref(null)
 // 开场白按钮选项
 const quickActions = [
   '聊天开场白',
+  '聊天整体流程框架',
+  '聊天话题有哪些',
+  '给我推荐几个有趣的聊天话题'
 ]
 
 // 判断是否显示开场白按钮
@@ -488,6 +491,11 @@ const handleSend = async (customMessage) => {
 
 .text-center {
   text-align: center;
+}
+
+.whitespace-pre-wrap {
+  white-space: pre-wrap;
+  word-wrap: break-word;
 }
 
 .hover\:bg-gray-50:hover {
