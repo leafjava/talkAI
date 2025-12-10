@@ -3,7 +3,7 @@
     <div class="bg-white dark:bg-[#1a1a2e] rounded-lg shadow-2xl w-full h-full flex flex-col border-0">
       <!-- Header -->
       <div class="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-[#34495e]">
-        <h2 class="text-lg font-semibold text-blue-600 dark:text-blue-400">ai智能助手</h2>
+        <h2 class="text-lg font-semibold text-blue-600 dark:text-blue-400">fox狐狸精恋爱教练-leaf</h2>
         <button
           @click="emit('close')"
           class="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
