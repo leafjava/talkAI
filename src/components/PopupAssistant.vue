@@ -1,11 +1,11 @@
 <template>
   <div v-if="isOpen" class="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-    <div class="bg-white dark:bg-[#1a1a2e] rounded-lg shadow-2xl w-[500px] h-[600px] flex flex-col border border-gray-200 dark:border-[#34495e]">
+    <div class="bg-white dark:bg-[#1a1a2e] rounded-lg shadow-2xl w-full h-full flex flex-col border-0">
       <!-- Header -->
       <div class="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-[#34495e]">
         <h2 class="text-lg font-semibold text-blue-600 dark:text-blue-400">ai智能助手</h2>
         <button
-          @click="$emit('close')"
+          @click="emit('close')"
           class="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
         >
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -133,10 +133,7 @@ const messagesContainer = ref(null)
 
 // 开场白按钮选项
 const quickActions = [
-  '你都支持哪些区块链网络的代币兑换？',
-  '帮我把 0.5 ETH 换成 USDC',
-  '主要功能',
-  'X402 Smart Bundler 还能提供哪些服务？'
+  '聊天开场白',
 ]
 
 // 判断是否显示开场白按钮
@@ -274,12 +271,16 @@ const handleSend = async (customMessage) => {
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
 }
 
-.w-\[500px\] {
-  width: 500px;
+.w-full {
+  width: 100%;
 }
 
-.h-\[600px\] {
-  height: 600px;
+.h-full {
+  height: 100%;
+}
+
+.border-0 {
+  border-width: 0;
 }
 
 .flex-col {
