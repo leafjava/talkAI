@@ -84,7 +84,44 @@
 
       <!-- Input -->
       <div class="border-t border-gray-200 dark:border-[#34495e] p-4">
+        <!-- 图片预览区域 -->
+        <div v-if="uploadedImages.length > 0" class="mb-3 flex flex-wrap gap-2">
+          <div
+            v-for="(img, index) in uploadedImages"
+            :key="index"
+            class="relative inline-block"
+          >
+            <img :src="img.preview" alt="预览" class="w-20 h-20 object-cover rounded border border-gray-300" />
+            <button
+              @click="removeImage(index)"
+              class="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 text-xs"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+        
         <div class="flex items-center gap-2">
+          <!-- 文件上传按钮 -->
+          <input
+            ref="fileInput"
+            type="file"
+            accept="image/*"
+            multiple
+            @change="handleFileSelect"
+            class="hidden"
+          />
+          <button
+            @click="$refs.fileInput.click()"
+            :disabled="isLoading"
+            class="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title="上传图片"
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+          </button>
+          
           <input
             v-model="message"
             type="text"
@@ -95,7 +132,7 @@
           />
           <button
             @click="handleSend()"
-            :disabled="isLoading || !message.trim()"
+            :disabled="isLoading || (!message.trim() && uploadedImages.length === 0)"
             class="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -110,7 +147,7 @@
 
 <script setup>
 import { ref, computed, nextTick, watch } from 'vue'
-import { sendDifyMessageStream } from '@/utils/dify-api'
+import { sendDifyMessageStream, uploadFileToDify } from '@/utils/dify-api'
 
 const props = defineProps({
   isOpen: {
@@ -130,6 +167,8 @@ const userId = ref(`user_${Date.now()}_${Math.random().toString(36).slice(2, 11)
 const conversationId = ref('')
 const assistantMessageId = ref(null)
 const messagesContainer = ref(null)
+const fileInput = ref(null)
+const uploadedImages = ref([]) // 存储已上传的图片信息 { file, preview, uploadedData }
 
 // 开场白按钮选项
 const quickActions = [
@@ -160,27 +199,80 @@ const handleQuickAction = (actionText) => {
   handleSend(actionText)
 }
 
+// 处理文件选择
+const handleFileSelect = async (event) => {
+  const files = Array.from(event.target.files)
+  
+  for (const file of files) {
+    // 检查文件类型
+    if (!file.type.startsWith('image/')) {
+      alert('只支持上传图片文件')
+      continue
+    }
+    
+    // 创建预览
+    const preview = URL.createObjectURL(file)
+    
+    // 添加到待上传列表
+    uploadedImages.value.push({
+      file,
+      preview,
+      uploadedData: null
+    })
+  }
+  
+  // 清空 input
+  event.target.value = ''
+}
+
+// 移除图片
+const removeImage = (index) => {
+  const img = uploadedImages.value[index]
+  URL.revokeObjectURL(img.preview)
+  uploadedImages.value.splice(index, 1)
+}
+
 const handleSend = async (customMessage) => {
   const messageToSend = customMessage || message.value.trim()
-  if (!messageToSend || isLoading.value) return
+  if ((!messageToSend && uploadedImages.value.length === 0) || isLoading.value) return
   
-  const userMessage = messageToSend
+  const userMessage = messageToSend || '(发送了图片)'
   messages.value.push({ id: Date.now(), text: userMessage, sender: 'user' })
   message.value = ''
   isLoading.value = true
   
-  // 创建占位符助手消息用于流式输出
-  const newAssistantMessageId = Date.now() + 1
-  assistantMessageId.value = newAssistantMessageId
-  messages.value.push({ 
-    id: newAssistantMessageId, 
-    text: '', 
-    sender: 'assistant' 
-  })
-  
   try {
+    // 先上传所有图片
+    const uploadedFiles = []
+    for (const img of uploadedImages.value) {
+      try {
+        const uploadResult = await uploadFileToDify(img.file, userId.value)
+        uploadedFiles.push({
+          type: 'image',
+          transfer_method: 'remote_url',
+          url: uploadResult.url || uploadResult.id,
+          upload_file_id: uploadResult.id
+        })
+      } catch (error) {
+        console.error('图片上传失败:', error)
+      }
+    }
+    
+    // 清空已上传的图片
+    uploadedImages.value.forEach(img => URL.revokeObjectURL(img.preview))
+    uploadedImages.value = []
+    
+    // 创建占位符助手消息用于流式输出
+    const newAssistantMessageId = Date.now() + 1
+    assistantMessageId.value = newAssistantMessageId
+    messages.value.push({ 
+      id: newAssistantMessageId, 
+      text: '', 
+      sender: 'assistant' 
+    })
+    
     const result = await sendDifyMessageStream(
-      userMessage,
+      messageToSend || '请分析这张图片',
       userId.value,
       (chunk) => {
         // 更新助手消息
@@ -191,7 +283,8 @@ const handleSend = async (customMessage) => {
           return msg
         })
       },
-      conversationId.value
+      conversationId.value,
+      uploadedFiles
     )
     
     // 保存会话ID以便后续对话
@@ -543,6 +636,62 @@ const handleSend = async (customMessage) => {
   height: 1.5rem;
 }
 
+.w-20 {
+  width: 5rem;
+}
+
+.h-20 {
+  height: 5rem;
+}
+
+.object-cover {
+  object-fit: cover;
+}
+
+.relative {
+  position: relative;
+}
+
+.absolute {
+  position: absolute;
+}
+
+.-top-2 {
+  top: -0.5rem;
+}
+
+.-right-2 {
+  right: -0.5rem;
+}
+
+.bg-red-500 {
+  background-color: #ef4444;
+}
+
+.hover\:bg-red-600:hover {
+  background-color: #dc2626;
+}
+
+.hover\:bg-gray-100:hover {
+  background-color: #f3f4f6;
+}
+
+.inline-block {
+  display: inline-block;
+}
+
+.flex-wrap {
+  flex-wrap: wrap;
+}
+
+.mb-3 {
+  margin-bottom: 0.75rem;
+}
+
+.hidden {
+  display: none;
+}
+
 @keyframes bounce {
   0%, 100% {
     transform: translateY(0);
@@ -608,6 +757,10 @@ const handleSend = async (customMessage) => {
   
   .dark\:hover\:bg-blue-900\/20:hover {
     background-color: rgba(30, 58, 138, 0.2);
+  }
+  
+  .dark\:hover\:bg-gray-700:hover {
+    background-color: #374151;
   }
 }
 </style>

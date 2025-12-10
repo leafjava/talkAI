@@ -9,14 +9,47 @@ const DIFY_CONFIG = {
 }
 
 /**
+ * 上传文件到 Dify
+ * @param {File} file - 要上传的文件
+ * @param {string} userId - 用户 ID
+ * @returns {Promise<{id: string, name: string, size: number, extension: string, mime_type: string}>} 上传后的文件信息
+ */
+export async function uploadFileToDify(file, userId) {
+  try {
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('user', userId)
+
+    const response = await fetch(`${DIFY_CONFIG.BASE_URL}/files/upload`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${DIFY_CONFIG.API_KEY}`
+      },
+      body: formData
+    })
+
+    if (!response.ok) {
+      throw new Error(`文件上传失败: ${response.status}`)
+    }
+
+    const data = await response.json()
+    return data
+  } catch (error) {
+    console.error('Failed to upload file to Dify:', error)
+    throw error
+  }
+}
+
+/**
  * 使用流式 API 向 Dify AI 助手发送消息
  * @param {string} userMessage - 用户消息内容
  * @param {string} userId - 用户 ID
  * @param {Function} onChunk - 接收到数据块时的回调函数
  * @param {string} conversationId - 会话 ID（可选）
+ * @param {Array} files - 上传的文件列表（可选）
  * @returns {Promise<{response: string, conversationId: string}>} 完整的助手回复内容和会话ID
  */
-export async function sendDifyMessageStream(userMessage, userId, onChunk, conversationId = '') {
+export async function sendDifyMessageStream(userMessage, userId, onChunk, conversationId = '', files = []) {
   try {
     const response = await fetch(`${DIFY_CONFIG.BASE_URL}/chat-messages`, {
       method: 'POST',
@@ -29,7 +62,8 @@ export async function sendDifyMessageStream(userMessage, userId, onChunk, conver
         query: userMessage,
         response_mode: 'streaming',
         conversation_id: conversationId || undefined,
-        user: userId
+        user: userId,
+        files: files.length > 0 ? files : undefined
       })
     })
 
